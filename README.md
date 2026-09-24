@@ -4,6 +4,8 @@
 > Enunciado: [`../trabalho-IA-01.pdf`](../trabalho-IA-01.pdf)
 > Prazo final (código no Canvas **e** apresentação em aula prática): **09/10/2026**. Grupos de até 3 pessoas. Atraso desconta 0,5 pt por semana.
 
+> 👥 **Integrantes do grupo:** para baixar o projeto e enviar alterações, leia o [`COMO_USAR_GITHUB.md`](COMO_USAR_GITHUB.md).
+
 ## Estrutura
 
 ```
