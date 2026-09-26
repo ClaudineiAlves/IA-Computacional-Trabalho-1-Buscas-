@@ -5,7 +5,7 @@
 ## Estrutura
 
 ```
-trabalho_1_buscas/
+IA-Computacional-Trabalho-1-Buscas-/
 ├── .vscode/
 │   ├── tasks.json              → compilar / compilar e executar (gcc)
 │   ├── launch.json             → depurar com gdb (F5)
@@ -14,6 +14,8 @@ trabalho_1_buscas/
 ├── testes/        → casos de teste e resultados observados
 ├── apresentacao/  → roteiro e anotações para a apresentação e a arguição
 ├── build/         → executáveis gerados (criada ao compilar; ignorada pelo git)
+├── README.md      → este arquivo
+├── guide_github.md → como baixar, trabalhar e enviar alterações pelo GitHub
 └── .gitignore
 ```
 
