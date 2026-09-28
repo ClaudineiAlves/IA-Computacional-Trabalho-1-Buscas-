@@ -15,7 +15,7 @@ IA-Computacional-Trabalho-1-Buscas-/
 ├── apresentacao/  → roteiro e anotações para a apresentação e a arguição
 ├── build/         → executáveis gerados (criada ao compilar; ignorada pelo git)
 ├── README.md      → este arquivo
-├── guide_github.md → como baixar, trabalhar e enviar alterações pelo GitHub
+├── guide_github.md → como baixar, trabalhar e enviar alterações pelo GitHub Desktop
 └── .gitignore
 ```
 
