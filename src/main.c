@@ -96,7 +96,14 @@ int main()
             int filho = filhos[i];
             if (esta_no_vetor(fila, qtd_fila, filho) || esta_no_vetor(visitados, qtd_visitados, filho)) {
                 printf("  %d ignorado (ja esta na fila ou nos visitados)\n", filho);
-            } else if (qtd_fila < TAM_VETOR) {
+            }
+            else if (filho<1 || filho>100){
+                printf(" %d ignorado (ultrapassou o limite inferior/superior)\n",filho);
+            }
+            else if(qtd_fila >= TAM_VETOR){
+                printf(" %d ignorado (estourou o tamanho da fila)\n",filho);
+            }
+            else if (qtd_fila < TAM_VETOR) {
                 fila[qtd_fila++] = filho;
             }
         }
