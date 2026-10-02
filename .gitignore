@@ -7,3 +7,6 @@ bin/
 obj/
 *.layout
 *.depend
+
+# VSCodium (C/C++ Compile Run): executáveis gerados
+output/
