@@ -1,8 +1,16 @@
 #include <stdio.h>
+#include <windows.h> // Para a tabela de menu
 
 // Tamanho de todos os vetores (fila e visitados).
 // Comece com 5 para comparar com a versão feita em aula.
 #define TAM_VETOR 5
+
+// Profundidade máxima da busca (P). Teste com valores diferentes.
+#define LIMITE_PROFUNDIDADE 5
+// Tamanho do vetor 'caminho'.
+// Precisa de LIMITE_PROFUNDIDADE + 1 posições (a posição 0 é o estado inicial).
+#define TAM_CAMINHO 6
+
 
 int eh_primo(int numero)
 {
@@ -41,7 +49,7 @@ void imprime_vetor(const char* nome, int vetor[], int qtd)
     printf("]\n");
 }
 
-int main()
+int busca_largura()
 {
     int estado_inicial = -1, atual, esq, dir;
     int fila[TAM_VETOR]; // fronteira (FIFO): o próximo a visitar é sempre fila[0]
@@ -119,4 +127,148 @@ int main()
     }
 
     return 0;
+}
+
+//PARTE DO BRENO! (BUSCA EM PROFUNDIDADE LIMITADA):
+// Retorna 1 se 'estado' já está no caminho (posições 0 até 'profundidade' - 1).
+// Retorna 0 caso contrário.
+// Só olha o caminho (os ancestrais), nunca a fronteira.
+
+// Variáveis globais da busca em profundidade (a recursão precisa enxergá-las)
+int caminho[TAM_CAMINHO];      // caminho[p] = estado visitado na profundidade p
+int profundidade_solucao = -1; // profundidade em que o primo foi achado
+int saiu_do_intervalo = 0;     // avisa no final se tentou gerar nós fora de 1..100
+int estourou_memoria = 0;      // avisa no final se o caminho não coube no vetor
+int atingiu_limite = 0;        // avisa no final se bateu no limite de profundidade
+
+int encontrou = 0;
+// 0 = ainda não achou nenhum primo (valor inicial; também vale se a busca falhar)
+// 1 = achou um primo (a busca para de explorar os outros ramos)
+
+int caminho_visitado(int estado, int profundidade)
+{
+    for (int i = 0; i < profundidade; i++) {
+        if (caminho[i] == estado) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// Busca em profundidade limitada (recursiva).
+// Retorna o estado primo encontrado, ou -1 se não achou nada a partir deste nó.
+
+void busca_profundidade(int estado, int profundidade)
+{
+    // Caso base 1: o caminho não cabe mais no vetor (estouro de memória)
+    if (profundidade >= TAM_CAMINHO) {
+        printf("%d descartado (estourou o tamanho do caminho)\n", profundidade * 2, "", estado);
+        estourou_memoria = 1;
+    }
+    else {
+        // Adiciona o estado ao caminho
+        caminho[profundidade] = estado;
+        printf("Visitando %d (profundidade %d)\n", estado, profundidade);
+
+        // Caso base 2: o estado é primo (objetivo)
+        if (eh_primo(estado)) {
+            profundidade_solucao = profundidade;
+            encontrou = 1;
+        }
+        // Caso base 3: bateu a profundidade máxima
+        // [ALTERADO] antes: return -1;  -> agora 'encontrou' continua 0
+        else if (profundidade >= LIMITE_PROFUNDIDADE) {
+            atingiu_limite = 1;
+        }
+        else {
+            // Produzir nós filhos
+            int esq = estado - 2;
+            int dir = estado + 5;
+            int filhos[2] = { esq, dir };
+
+            // Chamar a recursão para um filho de cada vez
+            for (int i = 0; i < 2 && encontrou == 0; i++) {
+                int filho = filhos[i];
+
+                if (filho < 1 || filho > 100) {
+                    printf("%d ignorado (fora do intervalo 1 a 100)\n", (profundidade + 1) * 2, "", filho);
+                    saiu_do_intervalo = 1;
+                }
+                else if (caminho_visitado(filho, profundidade + 1)) {
+                    printf("%d ignorado (ja esta no caminho)\n", (profundidade + 1) * 2, "", filho);
+                }
+                else {
+                    busca_profundidade(filho, profundidade + 1);
+                }
+            }
+            //se nenhum filho achou, 'encontrou' continua 0
+        }
+    }
+}
+
+// Le o estado inicial, chama a busca uma única vez e imprime os avisos
+int executa_profundidade()
+{
+    int estado_inicial = -1;
+
+    // Definir o estado inicial (repete enquanto estiver fora de 1 a 100)
+    do {
+        printf("Defina um numero de 1 a 100: ");
+        scanf("%d", &estado_inicial);
+    } while (estado_inicial < 1 || estado_inicial > 100);
+
+    printf("\nLimite de profundidade: %d\n\n", LIMITE_PROFUNDIDADE);
+
+    // Uma única chamada, como pede o enunciado
+    busca_profundidade(estado_inicial, 0);
+
+    if (encontrou == 1) {
+        printf("\nPrimo encontrado: %d\n", caminho[profundidade_solucao]); // antes: resultado
+        imprime_vetor("Caminho", caminho, profundidade_solucao + 1);
+    } else {
+        printf("\nNenhum primo encontrado dentro do limite de profundidade.\n");
+    }
+
+    // Avisos finais pedidos no enunciado
+    if (atingiu_limite) {
+        printf("Aviso: A busca atingiu o limite de profundidade.\n");
+    }
+    if (saiu_do_intervalo) {
+        printf("Aviso: A busca tentou gerar estados fora do intervalo 1 a 100.\n");
+    }
+    if (estourou_memoria) {
+        printf("Aviso: Houve estouro de memoria (caminho cheio). Alguns nos foram descartados.\n");
+    }
+
+    return 0;
+}
+
+// Parte que o usuário irá escolher a busca desejada
+int main()
+{
+    int opcao = 0;
+
+    SetConsoleOutputCP(CP_UTF8); //Para a exibição correta do menu
+
+printf("╔════════════════════════════════════╗\n");
+printf("║  ESCOLHA O TIPO DE BUSCA DESEJADA  ║\n");
+printf("╠════════════════════════════════════╣\n");
+printf("║ [1] Busca em largura               ║\n");
+printf("║ [2] Busca em profundidade limitada ║\n");
+printf("║                                    ║\n");
+printf("╠════════════════════════════════════╣\n");
+printf("║  Escolha:                          ║\r");   // \r em vez de \n: o cursor volta ao início da linha
+printf("║  Escolha: ");                               // reescreve o começo e deixa o cursor depois do "Escolha: "
+scanf("%d", &opcao);
+printf("╚════════════════════════════════════╝\n");
+
+    switch (opcao) {
+        case 1:
+            return busca_largura();
+        case 2:
+            return executa_profundidade();
+        default:
+            printf("Opcao invalida.\n");
+            return 1;
+    }
 }
