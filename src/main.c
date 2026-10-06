@@ -243,6 +243,90 @@ int executa_profundidade()
     return 0;
 }
 
+void busca_profundidade_iterativa(int estado, int profundidade, int limite)
+{ //quando a aux aumentar, o programa ira avisar que houve um aumento no limite
+
+    if (profundidade >= TAM_CAMINHO) {
+    printf("%d descartado (estourou o tamanho do caminho)\n", profundidade * 2, "", estado);
+    estourou_memoria = 1;
+    }
+
+    else {  //vai decidir o que fazer agora sabendo que ainda tem memória
+            // Adiciona o estado ao caminho
+        caminho[profundidade] = estado;
+        printf("Visitando %d (profundidade %d)\n", estado, profundidade + 1);
+
+        // Caso base 2: o estado é primo (objetivo)
+        if (eh_primo(estado)) {
+            profundidade_solucao = profundidade;
+            encontrou = 1;
+            return;
+        }
+        else {
+            // Produzir nós filhos
+            if(profundidade < limite){
+            int esq = estado - 2;
+            int dir = estado + 5;
+            int filhos[2] = { esq, dir };
+
+            // Chamar a recursão para um filho de cada vez
+            for (int i = 0; i < 2 && encontrou == 0; i++) {
+                int filho = filhos[i];
+
+                if (filho < 1 || filho > 100) {
+                    printf("%d ignorado (fora do intervalo 1 a 100)\n", (limite + 1) * 2, "", filho);
+                    saiu_do_intervalo = 1;
+                }
+                else if (caminho_visitado(filho, profundidade + 1)) {
+                    printf("%d ignorado (ja esta no caminho)\n", (limite + 1) * 2, "", filho);
+                }
+                else {
+                    busca_profundidade_iterativa(filho, profundidade + 1, limite);
+                }
+            }
+            //se nenhum filho achou, 'encontrou' continua 0
+            }
+        }
+    }
+}
+
+int executa_profundidade_iterativa()
+{
+    int estado_inicial = -1, limite = 1;
+
+    // Definir o estado inicial (repete enquanto estiver fora de 1 a 100)
+    do {
+        printf("Defina um numero de 1 a 100: ");
+        scanf("%d", &estado_inicial);
+    } while (estado_inicial < 1 || estado_inicial > 100);
+
+    while(limite <= 10 && encontrou == 0){
+    printf("\nLimite de profundidade: %d\n\n", limite + 1);
+    busca_profundidade_iterativa(estado_inicial, 0, limite);
+    limite++; //limite aumentando for
+    }
+
+    if (encontrou == 1) {
+        printf("\nPrimo encontrado: %d\n", caminho[profundidade_solucao]); // antes: resultado
+        imprime_vetor("Caminho", caminho, profundidade_solucao + 1);
+    } else {
+        printf("\nNenhum primo encontrado dentro do limite de profundidade. Aumentando o limite em 1(um) nivel\n");
+    }
+
+    // Avisos finais pedidos no enunciado
+    if (atingiu_limite) {
+        printf("Aviso: A busca atingiu o limite de profundidade, aumentando o limite em um nivel.\n");
+    }
+    if (saiu_do_intervalo) {
+        printf("Aviso: A busca tentou gerar estados fora do intervalo 1 a 100.\n");
+    }
+    if (estourou_memoria) {
+        printf("Aviso: Houve estouro de memoria (caminho cheio). Alguns nos foram descartados.\n");
+    }
+
+    return 0;
+}
+
 // Parte que o usuário irá escolher a busca desejada
 int main()
 {
@@ -255,7 +339,7 @@ printf("║  ESCOLHA O TIPO DE BUSCA DESEJADA  ║\n");
 printf("╠════════════════════════════════════╣\n");
 printf("║ [1] Busca em largura               ║\n");
 printf("║ [2] Busca em profundidade limitada ║\n");
-printf("║                                    ║\n");
+printf("║ [3] Busca em prof. lim. iterativa  ║\n");
 printf("╠════════════════════════════════════╣\n");
 printf("║  Escolha:                          ║\r");   // \r em vez de \n: o cursor volta ao início da linha
 printf("║  Escolha: ");                               // reescreve o começo e deixa o cursor depois do "Escolha: "
@@ -267,6 +351,8 @@ printf("╚═══════════════════════
             return busca_largura();
         case 2:
             return executa_profundidade();
+        case 3:
+            return executa_profundidade_iterativa();
         default:
             printf("Opcao invalida.\n");
             return 1;
