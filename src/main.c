@@ -232,13 +232,12 @@ int caminho_visitado(const int caminho[], int estado, int profundidade)
 // A pilha da busca é a própria pilha de chamadas da recursão.
 
 //Recebe a struct compartilhada, o estado a visitar e o nível em que ele está. Devolve o primo encontrado ou -1("NAO ENCONTRADO").
-int busca_profundidade(BuscaProfundidade* busca, int estado, int profundidade)
+int busca_profundidade(BuscaProfundidade* busca, int estado, int profundidade) //"busca" é um ponteiro para uma "BuscaProfundidade"
 {
     // Verificação de memória: Se o nível já não cabe no vetor, ela não escreve nada (evitando estourar a memória)
     if (profundidade >= TAM_CAMINHO) {
         printf("%d descartado (vetor caminho cheio)\n", estado);
-        busca->estourou_memoria = 1;
-        //(*busca).estourou_memoria = 1;
+        busca->estourou_memoria = 1; //"vá até a struct que está no endereço "busca", pegue o campo "estourou_memoria" e coloque 1 nele"
         return NAO_ENCONTRADO;
     }
 
