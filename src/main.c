@@ -1,26 +1,58 @@
-#include <stdio.h>
-#include <windows.h> // Para a tabela de menu
+/*
+ * IAC · Trabalho 1: Buscas não informadas
+ *
+ * Problema: a partir de um estado inicial entre 1 e 100, encontrar um número primo
+ * usando as ações "andar duas casas à esquerda" (-2) e "andar cinco casas à direita" (+5).
+ *
+ * Tarefa 1: busca em largura (fila + visitados)
+ * Tarefa 2: busca em profundidade limitada (recursiva, verifica só o caminho)
+ * Tarefa 3: busca em profundidade limitada iterativa (limite começa em 1 e vai aumentando)
+ *
+ * Sem variáveis globais: o que a recursão precisa compartilhar (caminho, limite e avisos)
+ * fica na struct BuscaProfundidade, criada por quem inicia a busca e passada por ponteiro.
+ */
 
-// Tamanho de todos os vetores (fila e visitados).
+#include <stdio.h>
+
+#ifdef _WIN32
+#include <windows.h> // SetConsoleOutputCP: exibe a moldura do menu corretamente no Windows
+#endif
+
+// ===== Constantes do problema =====
+#define ESTADO_MIN 1 // menor estado válido
+#define ESTADO_MAX 100 // maior estado válido
+#define PASSO_ESQUERDA 2 // ação "andar duas casas à esquerda" (-2)
+#define PASSO_DIREITA 5 // ação "andar cinco casas à direita" (+5)
+#define QTD_FILHOS 2 // cada estado gera no máximo 2 filhos
+#define QTD_PRIMOS 25 // quantidade de primos entre 1 e 100
+#define NAO_ENCONTRADO -1 // retorno da busca em profundidade quando não acha primo
+
+// ===== Tarefa 1 =====
+// Tamanho dos vetores da busca em largura (fila e visitados).
 // Comece com 5 para comparar com a versão feita em aula.
 #define TAM_VETOR 5
 
-// Profundidade máxima da busca (P). Teste com valores diferentes.
+// ===== Tarefas 2 e 3 =====
+// Profundidade máxima da Tarefa 2 (o estado inicial está na profundidade 0).
 #define LIMITE_PROFUNDIDADE 5
-// Tamanho do vetor 'caminho'.
-// Precisa de LIMITE_PROFUNDIDADE + 1 posições (a posição 0 é o estado inicial).
+// Tamanho do vetor 'caminho'. Para caber a busca inteira, precisa de LIMITE_PROFUNDIDADE + 1.
+// Deixe menor que isso para testar o aviso de estouro de memória.
 #define TAM_CAMINHO 6
+// Tarefa 3: maior limite tentado antes de desistir (evita rodar para sempre)
+#define LIMITE_ITERATIVO_MAX 20
 
+// ===================== Funções auxiliares =====================
 
 int eh_primo(int numero)
 {
-    int primos[25] = { 2, 3, 5, 7, 11, 13,
+    // Tabela vale para o intervalo ESTADO_MIN..ESTADO_MAX (1 a 100)
+    int primos[QTD_PRIMOS] = { 2, 3, 5, 7, 11, 13,
         17, 19, 23, 29, 31, 37,
         41, 43, 47, 53, 59, 61,
         67, 71, 73, 79, 83, 89,
         97 };
 
-    for (int i = 0; i < 25; i++) {
+    for (int i = 0; i < QTD_PRIMOS; i++) {
         if (primos[i] == numero) {
             return 1; // é primo
         }
@@ -29,8 +61,14 @@ int eh_primo(int numero)
     return 0; // não é primo
 }
 
+// Validação de transição: 1 se o estado está dentro do intervalo permitido
+int estado_valido(int estado)
+{
+    return estado >= ESTADO_MIN && estado <= ESTADO_MAX;
+}
+
 // Retorna 1 se 'valor' está nas 'qtd' primeiras posições de 'vetor'
-int esta_no_vetor(int vetor[], int qtd, int valor)
+int esta_no_vetor(const int vetor[], int qtd, int valor)
 {
     for (int i = 0; i < qtd; i++) {
         if (vetor[i] == valor) {
@@ -40,7 +78,7 @@ int esta_no_vetor(int vetor[], int qtd, int valor)
     return 0;
 }
 
-void imprime_vetor(const char* nome, int vetor[], int qtd)
+void imprime_vetor(const char* nome, const int vetor[], int qtd)
 {
     printf("%s: [", nome);
     for (int i = 0; i < qtd; i++) {
@@ -49,27 +87,52 @@ void imprime_vetor(const char* nome, int vetor[], int qtd)
     printf("]\n");
 }
 
-int busca_largura()
+// Avisos finais pedidos no enunciado (comuns às três buscas)
+void imprime_avisos(int saiu_do_intervalo, int estourou_memoria)
 {
-    int estado_inicial = -1, atual, esq, dir;
+    if (saiu_do_intervalo) {
+        printf("Aviso: A busca tentou gerar estados fora do intervalo %d a %d.\n", ESTADO_MIN, ESTADO_MAX);
+    }
+    if (estourou_memoria) {
+        printf("Aviso: Houve estouro de memoria (vetor cheio). Alguns nos foram descartados.\n");
+    }
+}
+
+// Lê o estado inicial, repetindo enquanto a entrada for inválida (texto ou fora de 1..100).
+// Retorna 1 se leu um estado válido, 0 se a entrada acabou (EOF).
+int ler_estado_inicial(int* estado)
+{
+    int lidos, c;
+
+    while (1) {
+        printf("Defina um numero de %d a %d: ", ESTADO_MIN, ESTADO_MAX);
+        lidos = scanf("%d", estado);
+        if (lidos == EOF) {
+            return 0;
+        }
+
+        // Descarta o resto da linha (ex.: "abc"), senão o scanf leria o mesmo lixo para sempre
+        while ((c = getchar()) != '\n' && c != EOF) { }
+
+        if (lidos == 1 && estado_valido(*estado)) {
+            return 1;
+        }
+        printf("Entrada invalida.\n");
+    }
+}
+
+// ===================== Tarefa 1: busca em largura =====================
+
+void busca_largura(int estado_inicial)
+{
     int fila[TAM_VETOR]; // fronteira (FIFO): o próximo a visitar é sempre fila[0]
     int qtd_fila = 0;
     int visitados[TAM_VETOR]; // histórico dos nós já expandidos
     int qtd_visitados = 0;
+    int atual = estado_inicial;
     int encontrou = 0;
-
-    // Definir o estado inicial (repete enquanto estiver fora de 1..100)
-    do {
-        printf("Defina um numero de 1 a 100: ");
-        if (scanf("%d", &estado_inicial) != 1) {
-            int c;
-            while ((c = getchar()) != '\n' && c != EOF) { } // descarta entrada não numérica
-            if (c == EOF) {
-                return 1;
-            }
-            estado_inicial = -1;
-        }
-    } while (estado_inicial < 1 || estado_inicial > 100);
+    int saiu_do_intervalo = 0;
+    int estourou_memoria = 0;
 
     fila[qtd_fila++] = estado_inicial;
 
@@ -92,26 +155,27 @@ int busca_largura()
         // Guardar no histórico (sem escrever além do fim do vetor)
         if (qtd_visitados < TAM_VETOR) {
             visitados[qtd_visitados++] = atual;
+        } else {
+            printf("  %d nao guardado (vetor de visitados cheio)\n", atual);
+            estourou_memoria = 1;
         }
 
         // Produzir nós filhos
-        esq = atual - 2;
-        dir = atual + 5;
-        int filhos[2] = { esq, dir };
+        int filhos[QTD_FILHOS] = { atual - PASSO_ESQUERDA, atual + PASSO_DIREITA };
 
-        // Verificar fronteira e histórico; colocar na fila se houver espaço
-        for (int i = 0; i < 2; i++) {
+        // Validar transição, verificar fronteira e histórico, e colocar na fila se houver espaço
+        for (int i = 0; i < QTD_FILHOS; i++) {
             int filho = filhos[i];
-            if (esta_no_vetor(fila, qtd_fila, filho) || esta_no_vetor(visitados, qtd_visitados, filho)) {
+
+            if (!estado_valido(filho)) {
+                printf("  %d ignorado (fora do intervalo %d a %d)\n", filho, ESTADO_MIN, ESTADO_MAX);
+                saiu_do_intervalo = 1;
+            } else if (esta_no_vetor(fila, qtd_fila, filho) || esta_no_vetor(visitados, qtd_visitados, filho)) {
                 printf("  %d ignorado (ja esta na fila ou nos visitados)\n", filho);
-            }
-            else if (filho<1 || filho>100){
-                printf(" %d ignorado (ultrapassou o limite inferior/superior)\n",filho);
-            }
-            else if(qtd_fila >= TAM_VETOR){
-                printf(" %d ignorado (estourou o tamanho da fila)\n",filho);
-            }
-            else if (qtd_fila < TAM_VETOR) {
+            } else if (qtd_fila >= TAM_VETOR) {
+                printf("  %d descartado (fila cheia)\n", filho);
+                estourou_memoria = 1;
+            } else {
                 fila[qtd_fila++] = filho;
             }
         }
@@ -126,26 +190,34 @@ int busca_largura()
         printf("\nFila vazia: nenhum primo encontrado.\n");
     }
 
-    return 0;
+    imprime_avisos(saiu_do_intervalo, estourou_memoria);
 }
 
-//PARTE DO BRENO! (BUSCA EM PROFUNDIDADE LIMITADA):
-// Retorna 1 se 'estado' já está no caminho (posições 0 até 'profundidade' - 1).
-// Retorna 0 caso contrário.
+// ===================== Tarefas 2 e 3: busca em profundidade =====================
+
+// Tudo o que as chamadas recursivas precisam compartilhar (no lugar das variáveis globais)
+typedef struct {
+    int caminho[TAM_CAMINHO]; // caminho[p] = estado visitado na profundidade p
+    int limite; // profundidade máxima desta busca
+    int profundidade_solucao; // profundidade em que o primo foi achado
+    int saiu_do_intervalo; // 1 se tentou gerar estado fora do intervalo
+    int estourou_memoria; // 1 se algum estado não coube no vetor 'caminho'
+    int atingiu_limite; // 1 se algum ramo foi cortado pelo limite de profundidade
+} BuscaProfundidade;
+
+void inicia_busca(BuscaProfundidade* busca, int limite)
+{
+    busca->limite = limite;
+    //(*busca).limite = limite;
+    busca->profundidade_solucao = NAO_ENCONTRADO;
+    busca->saiu_do_intervalo = 0;
+    busca->estourou_memoria = 0;
+    busca->atingiu_limite = 0;
+}
+
+// Retorna 1 se 'estado' já está no caminho (posições 0 até 'profundidade' - 1), 0 caso contrário.
 // Só olha o caminho (os ancestrais), nunca a fronteira.
-
-// Variáveis globais da busca em profundidade (a recursão precisa enxergá-las)
-int caminho[TAM_CAMINHO];      // caminho[p] = estado visitado na profundidade p
-int profundidade_solucao = -1; // profundidade em que o primo foi achado
-int saiu_do_intervalo = 0;     // avisa no final se tentou gerar nós fora de 1..100
-int estourou_memoria = 0;      // avisa no final se o caminho não coube no vetor
-int atingiu_limite = 0;        // avisa no final se bateu no limite de profundidade
-
-int encontrou = 0;
-// 0 = ainda não achou nenhum primo (valor inicial; também vale se a busca falhar)
-// 1 = achou um primo (a busca para de explorar os outros ramos)
-
-int caminho_visitado(int estado, int profundidade)
+int caminho_visitado(const int caminho[], int estado, int profundidade)
 {
     for (int i = 0; i < profundidade; i++) {
         if (caminho[i] == estado) {
@@ -156,205 +228,165 @@ int caminho_visitado(int estado, int profundidade)
 }
 
 // Busca em profundidade limitada (recursiva).
-// Retorna o estado primo encontrado, ou -1 se não achou nada a partir deste nó.
-
-void busca_profundidade(int estado, int profundidade)
+// Retorna o estado primo encontrado, ou NAO_ENCONTRADO (-1) se não achou nada a partir deste nó.
+// A pilha da busca é a própria pilha de chamadas da recursão.
+int busca_profundidade(BuscaProfundidade* busca, int estado, int profundidade)
 {
-    // Caso base 1: o caminho não cabe mais no vetor (estouro de memória)
+    // Verificação de memória: o estado precisa caber no vetor 'caminho'
     if (profundidade >= TAM_CAMINHO) {
-        printf("%d descartado (estourou o tamanho do caminho)\n", profundidade * 2, "", estado);
-        estourou_memoria = 1;
+        printf("%*s%d descartado (vetor caminho cheio)\n", profundidade * 2, "", estado);
+        busca->estourou_memoria = 1;
+        //(*busca).estourou_memoria = 1;
+        return NAO_ENCONTRADO;
     }
-    else {
-        // Adiciona o estado ao caminho
-        caminho[profundidade] = estado;
-        printf("Visitando %d (profundidade %d)\n", estado, profundidade);
 
-        // Caso base 2: o estado é primo (objetivo)
-        if (eh_primo(estado)) {
-            profundidade_solucao = profundidade;
-            encontrou = 1;
-        }
-        // Caso base 3: bateu a profundidade máxima
-        // [ALTERADO] antes: return -1;  -> agora 'encontrou' continua 0
-        else if (profundidade >= LIMITE_PROFUNDIDADE) {
-            atingiu_limite = 1;
-        }
-        else {
-            // Produzir nós filhos
-            int esq = estado - 2;
-            int dir = estado + 5;
-            int filhos[2] = { esq, dir };
+    // Adiciona o estado ao caminho
+    busca->caminho[profundidade] = estado;
+    printf("%*sVisitando %d (profundidade %d)\n", profundidade * 2, "", estado, profundidade);
 
-            // Chamar a recursão para um filho de cada vez
-            for (int i = 0; i < 2 && encontrou == 0; i++) {
-                int filho = filhos[i];
+    // Objetivo: o estado é primo
+    if (eh_primo(estado)) {
+        busca->profundidade_solucao = profundidade;
+        return estado;
+    }
 
-                if (filho < 1 || filho > 100) {
-                    printf("%d ignorado (fora do intervalo 1 a 100)\n", (profundidade + 1) * 2, "", filho);
-                    saiu_do_intervalo = 1;
-                }
-                else if (caminho_visitado(filho, profundidade + 1)) {
-                    printf("%d ignorado (ja esta no caminho)\n", (profundidade + 1) * 2, "", filho);
-                }
-                else {
-                    busca_profundidade(filho, profundidade + 1);
-                }
+    // Bateu a profundidade máxima: não expande este nó
+    if (profundidade >= busca->limite) {
+        busca->atingiu_limite = 1;
+        return NAO_ENCONTRADO;
+    }
+
+    // Produzir nós filhos
+    int filhos[QTD_FILHOS] = { estado - PASSO_ESQUERDA, estado + PASSO_DIREITA };
+
+    // Chamar a recursão para um filho de cada vez
+    for (int i = 0; i < QTD_FILHOS; i++) {
+        int filho = filhos[i];
+
+        if (!estado_valido(filho)) {
+            printf("%*s%d ignorado (fora do intervalo %d a %d)\n", (profundidade + 1) * 2, "", filho, ESTADO_MIN, ESTADO_MAX);
+            busca->saiu_do_intervalo = 1;
+        } else if (caminho_visitado(busca->caminho, filho, profundidade + 1)) {
+            printf("%*s%d ignorado (ja esta no caminho)\n", (profundidade + 1) * 2, "", filho);
+        } else {
+            int resultado = busca_profundidade(busca, filho, profundidade + 1);
+            if (resultado != NAO_ENCONTRADO) {
+                return resultado; // achou no ramo do filho: repassa o primo para cima
             }
-            //se nenhum filho achou, 'encontrou' continua 0
         }
     }
+
+    // Nenhum filho achou: volta para o pai (backtracking).
+    // Não precisa apagar caminho[profundidade]: o próximo ramo sobrescreve essa posição.
+    return NAO_ENCONTRADO;
 }
 
-// Le o estado inicial, chama a busca uma única vez e imprime os avisos
-int executa_profundidade()
+void imprime_resultado_profundidade(const BuscaProfundidade* busca, int resultado)
 {
-    int estado_inicial = -1;
-
-    // Definir o estado inicial (repete enquanto estiver fora de 1 a 100)
-    do {
-        printf("Defina um numero de 1 a 100: ");
-        scanf("%d", &estado_inicial);
-    } while (estado_inicial < 1 || estado_inicial > 100);
-
-    printf("\nLimite de profundidade: %d\n\n", LIMITE_PROFUNDIDADE);
-
-    // Uma única chamada, como pede o enunciado
-    busca_profundidade(estado_inicial, 0);
-
-    if (encontrou == 1) {
-        printf("\nPrimo encontrado: %d\n", caminho[profundidade_solucao]); // antes: resultado
-        imprime_vetor("Caminho", caminho, profundidade_solucao + 1);
+    if (resultado != NAO_ENCONTRADO) {
+        printf("\nPrimo encontrado: %d (profundidade %d)\n", resultado, busca->profundidade_solucao);
+        imprime_vetor("Caminho", busca->caminho, busca->profundidade_solucao + 1);
     } else {
-        printf("\nNenhum primo encontrado dentro do limite de profundidade.\n");
-    }
-
-    // Avisos finais pedidos no enunciado
-    if (atingiu_limite) {
-        printf("Aviso: A busca atingiu o limite de profundidade.\n");
-    }
-    if (saiu_do_intervalo) {
-        printf("Aviso: A busca tentou gerar estados fora do intervalo 1 a 100.\n");
-    }
-    if (estourou_memoria) {
-        printf("Aviso: Houve estouro de memoria (caminho cheio). Alguns nos foram descartados.\n");
-    }
-
-    return 0;
-}
-
-void busca_profundidade_iterativa(int estado, int profundidade, int limite)
-{ //quando a aux aumentar, o programa ira avisar que houve um aumento no limite
-
-    if (profundidade >= TAM_CAMINHO) {
-    printf("%d descartado (estourou o tamanho do caminho)\n", profundidade * 2, "", estado);
-    estourou_memoria = 1;
-    }
-
-    else {  //vai decidir o que fazer agora sabendo que ainda tem memória
-            // Adiciona o estado ao caminho
-        caminho[profundidade] = estado;
-        printf("Visitando %d (profundidade %d)\n", estado, profundidade + 1);
-
-        // Caso base 2: o estado é primo (objetivo)
-        if (eh_primo(estado)) {
-            profundidade_solucao = profundidade;
-            encontrou = 1;
-            return;
-        }
-        else {
-            // Produzir nós filhos
-            if(profundidade < limite){
-            int esq = estado - 2;
-            int dir = estado + 5;
-            int filhos[2] = { esq, dir };
-
-            // Chamar a recursão para um filho de cada vez
-            for (int i = 0; i < 2 && encontrou == 0; i++) {
-                int filho = filhos[i];
-
-                if (filho < 1 || filho > 100) {
-                    printf("%d ignorado (fora do intervalo 1 a 100)\n", (limite + 1) * 2, "", filho);
-                    saiu_do_intervalo = 1;
-                }
-                else if (caminho_visitado(filho, profundidade + 1)) {
-                    printf("%d ignorado (ja esta no caminho)\n", (limite + 1) * 2, "", filho);
-                }
-                else {
-                    busca_profundidade_iterativa(filho, profundidade + 1, limite);
-                }
-            }
-            //se nenhum filho achou, 'encontrou' continua 0
-            }
-        }
+        printf("\nNenhum primo encontrado dentro do limite de profundidade %d.\n", busca->limite);
     }
 }
 
-int executa_profundidade_iterativa()
+// Tarefa 3: reaproveita busca_profundidade() da Tarefa 2, aumentando o limite a cada rodada
+void busca_profundidade_iterativa(int estado_inicial)
 {
-    int estado_inicial = -1, limite = 1;
+    BuscaProfundidade busca;
+    int resultado = NAO_ENCONTRADO;
+    int saiu_do_intervalo = 0;
+    int estourou_memoria = 0;
+    int limite;
 
-    // Definir o estado inicial (repete enquanto estiver fora de 1 a 100)
-    do {
-        printf("Defina um numero de 1 a 100: ");
-        scanf("%d", &estado_inicial);
-    } while (estado_inicial < 1 || estado_inicial > 100);
+    for (limite = 1; limite <= LIMITE_ITERATIVO_MAX; limite++) {
+        printf("\n--- Rodada %d: limite de profundidade %d ---\n", limite, limite);
 
-    while(limite <= 10 && encontrou == 0){
-    printf("\nLimite de profundidade: %d\n\n", limite + 1);
-    busca_profundidade_iterativa(estado_inicial, 0, limite);
-    limite++; //limite aumentando for
+        inicia_busca(&busca, limite);
+        resultado = busca_profundidade(&busca, estado_inicial, 0);
+
+        // Os avisos valem para a busca toda, então acumulam entre as rodadas
+        saiu_do_intervalo = saiu_do_intervalo || busca.saiu_do_intervalo;
+        estourou_memoria = estourou_memoria || busca.estourou_memoria;
+
+        if (resultado != NAO_ENCONTRADO) {
+            break;
+        }
+
+        // Se nenhum ramo foi cortado pelo limite, aumentar o limite não muda nada
+        // (acontece quando os ramos param por estouro do 'caminho', intervalo ou ciclo)
+        if (!busca.atingiu_limite) {
+            printf("Nenhum ramo foi cortado pelo limite: aumentar o limite nao ajuda.\n");
+            break;
+        }
+
+        printf("Nenhum primo com limite %d.\n", limite);
     }
 
-    if (encontrou == 1) {
-        printf("\nPrimo encontrado: %d\n", caminho[profundidade_solucao]); // antes: resultado
-        imprime_vetor("Caminho", caminho, profundidade_solucao + 1);
-    } else {
-        printf("\nNenhum primo encontrado dentro do limite de profundidade. Aumentando o limite em 1(um) nivel\n");
-    }
+    imprime_resultado_profundidade(&busca, resultado);
 
-    // Avisos finais pedidos no enunciado
-    if (atingiu_limite) {
-        printf("Aviso: A busca atingiu o limite de profundidade, aumentando o limite em um nivel.\n");
+    if (resultado == NAO_ENCONTRADO && limite > LIMITE_ITERATIVO_MAX) {
+        printf("Aviso: A busca parou no limite maximo de %d.\n", LIMITE_ITERATIVO_MAX);
     }
-    if (saiu_do_intervalo) {
-        printf("Aviso: A busca tentou gerar estados fora do intervalo 1 a 100.\n");
-    }
-    if (estourou_memoria) {
-        printf("Aviso: Houve estouro de memoria (caminho cheio). Alguns nos foram descartados.\n");
-    }
-
-    return 0;
+    imprime_avisos(saiu_do_intervalo, estourou_memoria);
 }
 
-// Parte que o usuário irá escolher a busca desejada
+// ===================== Menu =====================
+
 int main()
 {
-    int opcao = 0;
+    int opcao = -1;
+    int estado_inicial;
+    int resultado;
+    BuscaProfundidade busca;
 
-    SetConsoleOutputCP(CP_UTF8); //Para a exibição correta do menu
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8); // Para a exibição correta do menu
+#endif
 
-printf("╔════════════════════════════════════╗\n");
-printf("║  ESCOLHA O TIPO DE BUSCA DESEJADA  ║\n");
-printf("╠════════════════════════════════════╣\n");
-printf("║ [1] Busca em largura               ║\n");
-printf("║ [2] Busca em profundidade limitada ║\n");
-printf("║ [3] Busca em prof. lim. iterativa  ║\n");
-printf("╠════════════════════════════════════╣\n");
-printf("║  Escolha:                          ║\r");   // \r em vez de \n: o cursor volta ao início da linha
-printf("║  Escolha: ");                               // reescreve o começo e deixa o cursor depois do "Escolha: "
-scanf("%d", &opcao);
-printf("╚════════════════════════════════════╝\n");
+    printf("╔════════════════════════════════════╗\n");
+    printf("║  ESCOLHA O TIPO DE BUSCA DESEJADA  ║\n");
+    printf("╠════════════════════════════════════╣\n");
+    printf("║ [1] Busca em largura               ║\n");
+    printf("║ [2] Busca em profundidade limitada ║\n");
+    printf("║ [3] Busca em prof. lim. iterativa  ║\n");
+    printf("║ [0] Sair                           ║\n");
+    printf("╠════════════════════════════════════╣\n");
+    printf("║  Escolha:                          ║\r"); // \r: o cursor volta ao início da linha
+    printf("║  Escolha: "); // reescreve o começo e deixa o cursor depois do "Escolha: "
+    if (scanf("%d", &opcao) != 1) {
+        opcao = -1;
+    }
+    printf("╚════════════════════════════════════╝\n");
+
+    if (opcao < 0 || opcao > 3) {
+        printf("Opcao invalida.\n");
+        return 1;
+    }
+
+    if (!ler_estado_inicial(&estado_inicial)) {
+        return 1;
+    }
 
     switch (opcao) {
-        case 1:
-            return busca_largura();
-        case 2:
-            return executa_profundidade();
-        case 3:
-            return executa_profundidade_iterativa();
-        default:
-            printf("Opcao invalida.\n");
-            return 1;
+    case 1:
+        busca_largura(estado_inicial);
+        break;
+    case 2:
+        printf("\nLimite de profundidade: %d\n\n", LIMITE_PROFUNDIDADE);
+        inicia_busca(&busca, LIMITE_PROFUNDIDADE);
+        resultado = busca_profundidade(&busca, estado_inicial, 0); // uma única chamada, como pede o enunciado
+        imprime_resultado_profundidade(&busca, resultado);
+        if (busca.atingiu_limite) {
+            printf("Aviso: A busca atingiu o limite de profundidade.\n");
+        }
+        imprime_avisos(busca.saiu_do_intervalo, busca.estourou_memoria);
+        break;
+    case 3:
+        busca_profundidade_iterativa(estado_inicial);
+        break;
     }
+
+    return 0;
 }
