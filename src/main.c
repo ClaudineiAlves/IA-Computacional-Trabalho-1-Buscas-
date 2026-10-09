@@ -106,7 +106,7 @@ int ler_estado_inicial(int* estado) //o estado é o valor inicial que o usuário
 
     while (1) {
         printf("Defina um numero de %d a %d: ", ESTADO_MIN, ESTADO_MAX);
-        lidos = scanf("%d", &estado);
+        lidos = scanf("%d", estado);
 
         if (lidos == 1 && estado_valido(*estado)) {
             return 1;
