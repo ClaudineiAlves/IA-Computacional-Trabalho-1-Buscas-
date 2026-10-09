@@ -67,7 +67,7 @@ int estado_valido(int estado)
     return estado >= ESTADO_MIN && estado <= ESTADO_MAX;
 }
 
-// Retorna 1 se 'valor' está nas no vetor 'qtd' ou 0 caso não esteja.
+// Ver se uma variável está no vetor ou nao.
 int esta_no_vetor(const int vetor[], int qtd, int valor)
 {
     for (int i = 0; i < qtd; i++) {
