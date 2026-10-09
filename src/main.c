@@ -270,7 +270,7 @@ int busca_profundidade(BuscaProfundidade* busca, int estado, int profundidade) /
         } else if (caminho_visitado(busca->caminho, filho, profundidade + 1)) { //conferimos se o filho já está no caminho, olhando só os ancestrais
             printf("%d ignorado (ja esta no caminho)\n", filho);
         } else { //há a recursão: a função chama a si mesma com o filho
-            int resultado = busca_profundidade(busca, filho, profundidade + 1);
+            int resultado = busca_profundidade(busca, filho, profundidade + 1); //"resultado" devolve primo encontrado ou NAO_ENCONTRADO (-1).
             if (resultado != NAO_ENCONTRADO) {
                 return resultado; // achou no ramo do filho: repassa o primo para cima
             }
