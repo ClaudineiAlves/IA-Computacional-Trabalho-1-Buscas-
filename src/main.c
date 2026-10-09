@@ -61,13 +61,13 @@ int eh_primo(int numero)
     return 0; // não é primo
 }
 
-// Validação de transição: estado está dentro do intervalo permitido
+// Validação de transição: 1 se o estado está dentro do intervalo permitido
 int estado_valido(int estado)
 {
     return estado >= ESTADO_MIN && estado <= ESTADO_MAX;
 }
 
-// Ver se uma variável está no vetor ou nao.
+// Retorna 1 se 'valor' está nas 'qtd' primeiras posições de 'vetor'
 int esta_no_vetor(const int vetor[], int qtd, int valor)
 {
     for (int i = 0; i < qtd; i++) {
@@ -99,14 +99,20 @@ void imprime_avisos(int saiu_do_intervalo, int estourou_memoria)
 }
 
 // Lê o estado inicial, repetindo enquanto a entrada for inválida (texto ou fora de 1..100).
-// Retorna 1 se leu um estado válido
-int ler_estado_inicial(int* estado) //o estado é o valor inicial que o usuário define no inicio e o lidos é a fila
+// Retorna 1 se leu um estado válido, 0 se a entrada acabou (EOF).
+int ler_estado_inicial(int* estado)
 {
-    int lidos;
+    int lidos, c;
 
     while (1) {
         printf("Defina um numero de %d a %d: ", ESTADO_MIN, ESTADO_MAX);
         lidos = scanf("%d", estado);
+        if (lidos == EOF) {
+            return 0;
+        }
+
+        // Descarta o resto da linha (ex.: "abc"), senão o scanf leria o mesmo lixo para sempre
+        while ((c = getchar()) != '\n' && c != EOF) { }
 
         if (lidos == 1 && estado_valido(*estado)) {
             return 1;
@@ -128,16 +134,18 @@ void busca_largura(int estado_inicial)
     int saiu_do_intervalo = 0;
     int estourou_memoria = 0;
 
+    // usa o indice(0 no caso) para o estado inicial e depois soma 1 (++) para o contador da fila/vetor
     fila[qtd_fila++] = estado_inicial;
 
+    // enquanto tiver fila ocorre:
     while (qtd_fila > 0) {
         atual = fila[0];
         printf("\nVisitando %d\n", atual);
 
-        // Teste de objetivo quando o nó chega na frente da fila (como em sala)
+        // Teste de objetivo quando o nó chega na frente da fila(primo)
         if (eh_primo(atual)) {
             encontrou = 1;
-            break;
+            break; // finaliza quando for primo
         }
 
         // Remover o nó visitado da fila: desloca todos uma posição para a frente
@@ -189,17 +197,17 @@ void busca_largura(int estado_inicial)
 
 // ===================== Tarefas 2 e 3: busca em profundidade =====================
 
-// Isso substui todas as variavel globais. Cada chamada recursiva tem suas variáveis locais.
-// É um "bloco" de código onde agrupa tudo o que a recursão precisa compartilhar:
+// Tudo o que as chamadas recursivas precisam compartilhar
 typedef struct {
-    int caminho[TAM_CAMINHO]; // é o estado visitado na profundidade
-    int limite; // até que profundidade a busca pode descer.
-    int profundidade_solucao; // a profundidade que o primo foi encontrado
-    int saiu_do_intervalo; // vira 1 se algum filho saiu de 1 a 100.
-    int estourou_memoria; // vira 1 se algum estado não coube no vetor 'caminho'
-    int atingiu_limite; // vira 1 se algum ramo foi cortado pelo limite de profundidade
-} BuscaProfundidade; // usa esse nome para chamar todas essas informações
+    int caminho[TAM_CAMINHO]; // caminho[p] = estado visitado na profundidade p
+    int limite; // profundidade máxima desta busca
+    int profundidade_solucao; // profundidade em que o primo foi achado
+    int saiu_do_intervalo; // 1 se tentou gerar estado fora do intervalo
+    int estourou_memoria; // 1 se algum estado não coube no vetor 'caminho'
+    int atingiu_limite; // 1 se algum ramo foi cortado pelo limite de profundidade
+} BuscaProfundidade;
 
+// inicia os valores inciais da var struct BuscaProfundidade
 void inicia_busca(BuscaProfundidade* busca, int limite)
 {
     busca->limite = limite;
@@ -223,48 +231,48 @@ int caminho_visitado(const int caminho[], int estado, int profundidade)
 }
 
 // Busca em profundidade limitada (recursiva).
+// Retorna o estado primo encontrado, ou NAO_ENCONTRADO (-1) se não achou nada a partir deste nó.
 // A pilha da busca é a própria pilha de chamadas da recursão.
-
-//Recebe a struct compartilhada, o estado a visitar e o nível em que ele está. Devolve o primo encontrado ou -1("NAO ENCONTRADO").
-int busca_profundidade(BuscaProfundidade* busca, int estado, int profundidade) //"busca" é um ponteiro para uma "BuscaProfundidade"
+int busca_profundidade(BuscaProfundidade* busca, int estado, int profundidade)
 {
-    // Verificação de memória: Se o nível já não cabe no vetor, ela não escreve nada (evitando estourar a memória)
+    // Verificação de memória: o estado precisa caber no vetor 'caminho'
     if (profundidade >= TAM_CAMINHO) {
-        printf("%d descartado (vetor caminho cheio)\n", estado);
-        busca->estourou_memoria = 1; //"vá até a struct que está no endereço "busca", pegue o campo "estourou_memoria" e coloque 1 nele"
+        printf("%*s%d descartado (vetor caminho cheio)\n", profundidade * 2, "", estado);
+        busca->estourou_memoria = 1;
+        //(*busca).estourou_memoria = 1;
         return NAO_ENCONTRADO;
     }
 
-    // Registra a visita/caminho
+    // Adiciona o estado ao caminho
     busca->caminho[profundidade] = estado;
-    printf("Visitando %d (profundidade %d)\n", estado, profundidade);
+    printf("%*sVisitando %d (profundidade %d)\n", profundidade * 2, "", estado, profundidade);
 
     // Objetivo: o estado é primo
     if (eh_primo(estado)) {
-        busca->profundidade_solucao = profundidade;//grava a profundidade e devolve o próprio estado.
-        return estado; //encerra na hora, sem gerar filhos
+        busca->profundidade_solucao = profundidade;
+        return estado;
     }
 
-    // Bateu a profundidade máxima: nó é visitado, porém não é expandido
+    // Bateu a profundidade máxima: não expande este nó
     if (profundidade >= busca->limite) {
         busca->atingiu_limite = 1;
         return NAO_ENCONTRADO;
     }
 
-    // Produzir nós filhos: Os dois filhos são o estado -2 e o estado +5. A ordem importa: o da esquerda é sempre tentado primeiro.
+    // Produzir nós filhos
     int filhos[QTD_FILHOS] = { estado - PASSO_ESQUERDA, estado + PASSO_DIREITA };
 
     // Chamar a recursão para um filho de cada vez
     for (int i = 0; i < QTD_FILHOS; i++) {
         int filho = filhos[i];
 
-        if (!estado_valido(filho)) { // "caso o estado filho NÃO seja válido" //o filho é descartado, mas o laço continua para o outro filho.
-            printf("%d ignorado (fora do intervalo %d a %d)\n", filho, ESTADO_MIN, ESTADO_MAX);
+        if (!estado_valido(filho)) {
+            printf("%*s%d ignorado (fora do intervalo %d a %d)\n", (profundidade + 1) * 2, "", filho, ESTADO_MIN, ESTADO_MAX);
             busca->saiu_do_intervalo = 1;
-        } else if (caminho_visitado(busca->caminho, filho, profundidade + 1)) { //conferimos se o filho já está no caminho, olhando só os ancestrais
-            printf("%d ignorado (ja esta no caminho)\n", filho);
-        } else { //há a recursão: a função chama a si mesma com o filho
-            int resultado = busca_profundidade(busca, filho, profundidade + 1); //"resultado" devolve primo encontrado ou NAO_ENCONTRADO (-1).
+        } else if (caminho_visitado(busca->caminho, filho, profundidade + 1)) {
+            printf("%*s%d ignorado (ja esta no caminho)\n", (profundidade + 1) * 2, "", filho);
+        } else {
+            int resultado = busca_profundidade(busca, filho, profundidade + 1);
             if (resultado != NAO_ENCONTRADO) {
                 return resultado; // achou no ramo do filho: repassa o primo para cima
             }
@@ -295,6 +303,7 @@ void busca_profundidade_iterativa(int estado_inicial)
     int estourou_memoria = 0;
     int limite;
 
+    //
     for (limite = 1; limite <= LIMITE_ITERATIVO_MAX; limite++) {
         printf("\n--- Rodada %d: limite de profundidade %d ---\n", limite, limite);
 
