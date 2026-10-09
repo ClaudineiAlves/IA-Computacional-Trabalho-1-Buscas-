@@ -264,10 +264,10 @@ int busca_profundidade(BuscaProfundidade* busca, int estado, int profundidade) /
     for (int i = 0; i < QTD_FILHOS; i++) {
         int filho = filhos[i];
 
-        if (!estado_valido(filho)) { //o filho é descartado, mas o laço continua para o outro filho.
+        if (!estado_valido(filho)) { // "caso o estado filho NÃO seja válido" //o filho é descartado, mas o laço continua para o outro filho.
             printf("%d ignorado (fora do intervalo %d a %d)\n", filho, ESTADO_MIN, ESTADO_MAX);
             busca->saiu_do_intervalo = 1;
-        } else if (caminho_visitado(busca->caminho, filho, profundidade + 1)) { //o filho é descartado, mas o laço continua para o outro filho.
+        } else if (caminho_visitado(busca->caminho, filho, profundidade + 1)) { //conferimos se o filho já está no caminho, olhando só os ancestrais
             printf("%d ignorado (ja esta no caminho)\n", filho);
         } else { //há a recursão: a função chama a si mesma com o filho
             int resultado = busca_profundidade(busca, filho, profundidade + 1);
