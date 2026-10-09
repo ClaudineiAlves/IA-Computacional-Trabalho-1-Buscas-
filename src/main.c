@@ -100,13 +100,13 @@ void imprime_avisos(int saiu_do_intervalo, int estourou_memoria)
 
 // Lê o estado inicial, repetindo enquanto a entrada for inválida (texto ou fora de 1..100).
 // Retorna 1 se leu um estado válido
-int ler_estado_inicial(int* estado) //estado inicial é o primeiro número e o estado é o número atual
+int ler_estado_inicial(int* estado) //o estado é o valor inicial que o usuário define no inicio e o lidos é a fila
 {
     int lidos;
 
     while (1) {
         printf("Defina um numero de %d a %d: ", ESTADO_MIN, ESTADO_MAX);
-        lidos = scanf("%d", estado);
+        lidos = scanf("%d", &estado);
 
         if (lidos == 1 && estado_valido(*estado)) {
             return 1;
